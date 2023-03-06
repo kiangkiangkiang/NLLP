@@ -127,6 +127,9 @@ def main():
     train_ds = load_dataset(reader, data_path=data_args.train_path, max_seq_len=data_args.max_seq_length, lazy=False)
     dev_ds = load_dataset(reader, data_path=data_args.dev_path, max_seq_len=data_args.max_seq_length, lazy=False)
 
+    print("this is my test 87 =====")
+    print(train_ds)
+    print("this is my test 87 =====")
     trans_fn = partial(
         convert_example,
         tokenizer=tokenizer,
@@ -179,6 +182,18 @@ def main():
         compute_metrics=compute_metrics,
     )
 
+
+    print("sec 87 test=====")
+    
+    print(train_ds)
+    print(len(train_ds))
+    #print(train_ds[2])
+    print(train_ds[0].keys())
+    print(len(train_ds[20]["input_ids"]))
+    print(train_ds[20])
+    #print(train_ds[10]["end_positions"])
+    return
+    print("end 87 test ========")
     trainer.optimizer = paddle.optimizer.AdamW(
         learning_rate=training_args.learning_rate, parameters=model.parameters()
     )
