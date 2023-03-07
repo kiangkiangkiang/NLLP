@@ -389,6 +389,7 @@ def convert_ext_examples(
             entity_prompt = []
             entity_example_map = {}
             entity_map = {}  # id to entity name
+            luka_implement_for_subject_name = {}
             for entity in entities:
                 entity_name = text[entity["start_offset"] : entity["end_offset"]]
                 entity_map[entity["id"]] = {
@@ -396,6 +397,7 @@ def convert_ext_examples(
                     "start": entity["start_offset"],
                     "end": entity["end_offset"],
                 }
+                luka_implement_for_subject_name[entity["id"]] = entity["label"]
 
                 entity_label, entity_cls_label = _sep_cls_label(entity["label"], separator)
 
@@ -449,7 +451,18 @@ def convert_ext_examples(
                 # subject + "的" + predicate -> Chinese
                 # predicate + " of " + subject -> English
                 if schema_lang == "ch":
-                    prompt = entity_map[subject_id]["name"] + "的" + predicate
+                    # luka fix
+                    print("fdipsji")
+                    print("fdipsji")
+                    print("test 88")
+                    print(entities)
+                    print(luka_implement_for_subject_name)
+
+                    #before luka fix 
+                    #prompt = entity_map[subject_id]["name"] + "的" + predicate
+
+                    #after luka fix
+                    prompt = luka_implement_for_subject_name[subject_id] + "的" + predicate
                     inverse_negative = entity_map[object_id]["name"] + "的" + predicate
                 else:
                     prompt = predicate + " of " + entity_map[subject_id]["name"]
@@ -540,6 +553,7 @@ def convert_ext_examples(
                                 subject_goldens[i][random.randrange(len(subject_goldens[i]))] + "的" + non_ent_label
                                 for non_ent_label in non_ent_label_list
                             ]
+                            
                         else:
                             redundants3 = [
                                 non_ent_label + " of " + subject_goldens[i][random.randrange(len(subject_goldens[i]))]
