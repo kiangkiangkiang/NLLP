@@ -127,9 +127,9 @@ def main():
     train_ds = load_dataset(reader, data_path=data_args.train_path, max_seq_len=data_args.max_seq_length, lazy=False)
     dev_ds = load_dataset(reader, data_path=data_args.dev_path, max_seq_len=data_args.max_seq_length, lazy=False)
 
-    #print("this is my test 87 =====")
-    #print(train_ds)
-    #print("this is my test 87 =====")
+    print("this is my test 87 =====")
+    print(train_ds)
+    print("this is my test 87 =====")
     trans_fn = partial(
         convert_example,
         tokenizer=tokenizer,
@@ -140,7 +140,9 @@ def main():
 
     train_ds = train_ds.map(trans_fn)
     dev_ds = dev_ds.map(trans_fn)
-
+    print("test2 ===== ")
+    print(train_ds)
+    return
     if training_args.device == "npu":
         data_collator = DataCollatorWithPadding(tokenizer, padding="longest")
     else:
