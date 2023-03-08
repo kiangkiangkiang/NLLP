@@ -152,11 +152,13 @@ def main():
     #print(train_ds)
     #print(train_ds[0])
     #print("decode===================")
-    #print(tokenizer.decode(train_ds[2]['input_ids']) )
+    #print(tokenizer.decode(train_ds[2]['input_ids']))
+    #print(train_ds[2])
     #print(train_ds[2])
     #print(train_ds[0].keys())
     #print(type(train_ds[2]["input_ids"]))
     #print(type(train_ds))
+    
     
     if training_args.device == "npu":
         data_collator = DataCollatorWithPadding(tokenizer, padding="longest")
