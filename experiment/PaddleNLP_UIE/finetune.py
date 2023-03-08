@@ -128,10 +128,12 @@ def main():
     dev_ds = load_dataset(reader, data_path=data_args.dev_path, max_seq_len=data_args.max_seq_length, lazy=False)
     print("test2 ===== ")
     #print(train_ds)
-    print(train_ds[0:14])
-    print(len(train_ds[3]["content"]))
-    print(train_ds[0].keys())
-    print(type(train_ds))
+    print(train_ds[4])
+    
+    print(tokenizer(train_ds[0]["content"]))
+    #print(len(train_ds[3]["content"]))
+    #print(train_ds[0].keys())
+    #print(type(train_ds))
     trans_fn = partial(
         convert_example,
         tokenizer=tokenizer,
@@ -142,10 +144,13 @@ def main():
 
     train_ds = train_ds.map(trans_fn)
     dev_ds = dev_ds.map(trans_fn)
+    
     print("test3 ===== ")
+    #print(type(train_ds[0]))
     #print(train_ds)
-    #print(train_ds[2])
+    print(train_ds[0])
     print(train_ds[0].keys())
+    print(type(train_ds[2]["input_ids"]))
     print(type(train_ds))
     return
     if training_args.device == "npu":

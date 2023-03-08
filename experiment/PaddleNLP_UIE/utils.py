@@ -408,10 +408,10 @@ def convert_ext_examples(
                 # Sentiment classification + " of " + xxx -> English
                 if schema_lang == "ch":
                     #before luka fix
-                    #entity_cls_prompt_prefix = entity_name + "的" + prompt_prefix
+                    entity_cls_prompt_prefix = entity_name + "的" + prompt_prefix
 
                     #after luka fix
-                    entity_cls_prompt_prefix = entity["label"] + "的" + prompt_prefix
+                    #entity_cls_prompt_prefix = entity["label"] + "的" + prompt_prefix
                 else:
                     entity_cls_prompt_prefix = prompt_prefix + " of " + entity_name
                 if entity_cls_label is not None:
@@ -465,10 +465,10 @@ def convert_ext_examples(
                     #print(luka_implement_for_subject_name)
 
                     #before luka fix 
-                    #prompt = entity_map[subject_id]["name"] + "的" + predicate
+                    prompt = entity_map[subject_id]["name"] + "的" + predicate
 
                     #after luka fix
-                    prompt = luka_implement_for_subject_name[subject_id] + "的" + predicate
+                    #prompt = luka_implement_for_subject_name[subject_id] + "的" + predicate
                     inverse_negative = entity_map[object_id]["name"] + "的" + predicate
                 else:
                     prompt = predicate + " of " + entity_map[subject_id]["name"]
