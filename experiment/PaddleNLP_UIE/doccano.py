@@ -146,12 +146,12 @@ def do_convert():
                 is_train=False,
                 schema_lang=args.schema_lang,
             )
-            print("this is my 87 test....")
-            print("args.prompt_prefix = ", args.prompt_prefix)
-            print("args.options = ", args.options)
-            print("args.separator = ", args.separator)
+            #print("this is my 87 test....")
+            #print("args.prompt_prefix = ", args.prompt_prefix)
+            #print("args.options = ", args.options)
+            #print("args.separator = ", args.separator)
 
-            print("end my 87 test.....")
+            #print("end my 87 test.....")
         else:
             train_examples = _create_cls_examples(raw_examples[:p1], args.prompt_prefix, args.options)
             dev_examples = _create_cls_examples(raw_examples[p1:p2], args.prompt_prefix, args.options)
