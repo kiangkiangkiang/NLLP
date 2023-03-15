@@ -127,7 +127,7 @@ def main():
     train_ds = load_dataset(reader, data_path=data_args.train_path, max_seq_len=data_args.max_seq_length, lazy=False)
     dev_ds = load_dataset(reader, data_path=data_args.dev_path, max_seq_len=data_args.max_seq_length, lazy=False)
     #print("test2 ===== ")
-    #print(train_ds)
+    print(train_ds[0])
     #print(train_ds[2])
     #print(tokenizer(train_ds[0]["prompt"]))
     #print(tokenizer(train_ds[0]["content"]))
@@ -149,7 +149,7 @@ def main():
     
     #print("test3 ===== ")
     #print(type(train_ds[0]))
-    #print(train_ds)
+    print(train_ds[0])
     #print(train_ds[0])
     #print("decode===================")
     #print(tokenizer.decode(train_ds[2]['input_ids']))
@@ -158,7 +158,7 @@ def main():
     #print(train_ds[0].keys())
     #print(type(train_ds[2]["input_ids"]))
     #print(type(train_ds))
-    
+    return
     
     if training_args.device == "npu":
         data_collator = DataCollatorWithPadding(tokenizer, padding="longest")
