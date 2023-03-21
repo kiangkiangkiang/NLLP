@@ -7,6 +7,25 @@
 4. **多人情況**：多個原告，各有名稱代號，原本原告亡
 5. **原告改為「上訴人」**：標註時可注意「原告」僅為了代表「提出慰撫金的人」，因此可以從誰提出慰撫金來判定誰的「type==原告」。
 
+### Import:
+
+開label studio後
+1. 先把label格式改成以下：
+```javascript
+<Relations>
+    <Relation value="非財產上之損害的求償精神慰撫金"/>
+    <Relation value="法院得心證判斷之適當裁定精神慰撫金"/>
+    <Relation value="其他精神慰撫金"/>
+</Relations>
+<Labels name="label" toName="text">
+    <Label value="原告" background="#44ff00"/>
+    <Label value="非財產上之損害的求償精神慰撫金" background="#0062ff"/>
+    <Label value="法院得心證判斷之適當裁定精神慰撫金" background="#9e06e5"/>
+    <Label value="其他精神慰撫金" background="#ff0000"/>
+</Labels>
+```
+2. 直接import label_example.json 就可以了
+
 --- 
 
 ### Other
