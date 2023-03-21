@@ -1,8 +1,15 @@
 import numpy as np
 import os
 from paddlenlp import Taskflow
+import json
 from label_studio_ml.model import LabelStudioMLBase
+from torch.cuda import empty_cache
 
+#Set up label format
+PERSON = '原告'
+CHARGE_MONEY = '非財產上之損害的求償精神慰撫金'
+JUDGE_MONEY = '法院得心證判斷之適當裁定精神慰撫金'
+OTHER_MONEY = '其他精神慰撫金'
 PARSED_LABEL_CONFIG = {'label': {
     'type': 'Labels',
     'to_name': ['text'],
@@ -10,34 +17,47 @@ PARSED_LABEL_CONFIG = {'label': {
         'type': 'Text',
         'value': 'text'
     }],
-    'labels': ['原告', '非財產上之損害的求償精神慰撫金', '法院得心證判斷之適當裁定精神慰撫金', '其他精神慰撫金'],
+    'labels': [PERSON, CHARGE_MONEY, JUDGE_MONEY, OTHER_MONEY],
     'labels_attrs': {
-        '原告': {
-            'value': '原告',
+        PERSON: {
+            'value': PERSON,
             'background': '#44ff00'
         },
-        '非財產上之損害的求償精神慰撫金': {
-            'value': '非財產上之損害的求償精神慰撫金',
+        CHARGE_MONEY: {
+            'value': CHARGE_MONEY,
             'background': '#0062ff'
         },
-        '法院得心證判斷之適當裁定精神慰撫金': {
-            'value': '法院得心證判斷之適當裁定精神慰撫金',
+        JUDGE_MONEY: {
+            'value': JUDGE_MONEY,
             'background': '#9e06e5'
         },
-        '其他精神慰撫金': {
-            'value': '其他精神慰撫金',
+        OTHER_MONEY: {
+            'value': OTHER_MONEY,
             'background': '#ff0000'
         }
     }
 }
 }
-LABEL_SCHEMA = ['非財產上之損害的求償精神慰撫金', '法院得心證判斷之適當裁定精神慰撫金',
-                {'原告': '非財產上之損害的求償精神慰撫金',
-                 '原告': '法院得心證判斷之適當裁定精神慰撫金'}]
-DEL_REPEAT_ENTITY = True
-PRECISION = 'fp16' #GPU for fp16
-MODEL_PATH = "../NLLP/experiment/PaddleNLP_UIE/data_v3/checkpoint/model_best"
+LABEL_SCHEMA = [CHARGE_MONEY, JUDGE_MONEY,
+                {PERSON: CHARGE_MONEY,
+                 PERSON: JUDGE_MONEY}]
 
+#Set up inference model
+PRECISION = 'fp16' #GPU for fp16
+MODEL_PATH = "./NLLP/experiment/PaddleNLP_UIE/data_v3/checkpoint/model_best"
+
+#Set up label schema on label-studio
+DEL_OVERLAP_ENTITY = True
+DEL_REPEAT_PERSON = True
+ADD_RELATION = True
+
+#Set up learning loop parameter
+START_LEARNING_LOOP = True
+RETRAINING_DATA_SIZE = 1
+STORE_TRAINING_DATA_HISTORY = True
+STORE_PATH = "./NLLP/experiment/labelstudio"
+
+#Set up model training parameter
 
 
 class MyUIEPredictModel(LabelStudioMLBase):
@@ -46,22 +66,21 @@ class MyUIEPredictModel(LabelStudioMLBase):
         super(MyUIEPredictModel, self).__init__(**kwargs)
         self.parsed_label_config = PARSED_LABEL_CONFIG
         self.from_name, self.info = list(self.parsed_label_config.items())[0]
-        # print(self.from_name)
-        # print(self.info)
         self.to_name = self.info['to_name'][0]
         self.value = self.info['inputs'][0]['value']
         self.labels = list(self.info['labels'])
         self.task_ids = 1
         self.total_entity_id = 0
+        self.decanno_ext_id = 1
+        self.data_docano_format = []
+
+        #print(os.listdir(MODEL_PATH))
         self.model = Taskflow("information_extraction", schema=LABEL_SCHEMA,
                                 task_path=MODEL_PATH,
                                 precision=PRECISION)
-        #print(self.labels)
 
-        # task_path='./checkpoint/model_best'
-    
-    def _del_repeat_entity(self, result):
-        start_id_mapping = {}
+
+    def _del_overlap_entity(self, result):
         index = 0
         while index < len(result) - 1:
             if result[index]['value']['start'] == result[index + 1]['value']['start'] :
@@ -70,11 +89,12 @@ class MyUIEPredictModel(LabelStudioMLBase):
                 else:
                     result.pop(index)
             else:
-                start_id_mapping[result[index]['value']['start']] = result[index]['id']
                 index += 1
-        return result, start_id_mapping
+        return result
 
-    def _add_relation(self, result, relations, start_id_mapping):
+
+    def _add_relation(self, result, relations):
+        start_id_mapping = {result[index]['value']['start']: result[index]['id'] for index in range(len(result))}
 
         for relation in relations:
             people_start = relation['start']
@@ -91,15 +111,52 @@ class MyUIEPredictModel(LabelStudioMLBase):
                         ]
                     })
         return result
-        
+    
+
+    def _del_repeat_person(self, result):
+        #This function must be executed after sorted
+        unique_name_map = []
+        result_index = []
+        for i, item in enumerate(result):
+            print(item)
+            if item['value']['labels'][0] == PERSON:
+                if item['value']['text'] not in unique_name_map:
+                    unique_name_map.append(item['value']['text'])
+                    result_index.append(i)
+            else:
+                result_index.append(i)
+        return list(np.array(result)[result_index])
+
+    
+    def _labelstudio2docano(self, labelstudio_output):
+        id = self.decanno_ext_id
+        text = labelstudio_output['data']['task']['data']['text']
+        entities = []
+        relations = []
+
+        for label_result in labelstudio_output['data']['annotation']['result']:
+            #entity
+            if label_result.get('value') is not None:
+                entities.append({
+                    "id": label_result['id'],
+                    "label": label_result['value']['labels'][0],
+                    "start_offset": label_result['value']['start'],
+                    "end_offset": label_result['value']['end']
+                })
+            else: #relation
+                relations.append({
+                    "id": label_result['from_id'] + label_result['to_id'],
+                    "from_id": label_result['from_id'],
+                    "to_id": label_result['to_id'],
+                    "type": label_result['labels'][0]
+                })
+                
+        self.decanno_ext_id += 1
+        return {"id": id, "text": text, "entities": entities, "relations": relations}
 
 
     def predict(self, tasks, **kwargs):
         print('======== in predict ========')
-        self.model = Taskflow("information_extraction", schema=LABEL_SCHEMA,
-                        task_path=MODEL_PATH,
-                        precision=PRECISION)
-
         from_name = self.from_name
         to_name = self.to_name
         model = self.model
@@ -115,12 +172,11 @@ class MyUIEPredictModel(LabelStudioMLBase):
             result = []
             scores = []
             relations = []
-            start_id_mapping = {}
 
             for key in uie:
                 #print("key: ", key)
                 for item in uie[key]:
-                    print('item: ', item)
+                    #print('item: ', item)
                     result.append({
                         'value': {
                             'start': item['start'],
@@ -140,25 +196,110 @@ class MyUIEPredictModel(LabelStudioMLBase):
                     scores.append(item['probability'])
                         
             result = sorted(result, key=lambda x: x['value']['start'])
-
-            print("===== result =======")
-            print(result)
-            if DEL_REPEAT_ENTITY:
-                result, start_id_mapping = self._del_repeat_entity(result)
-            result = self._add_relation(result, relations, start_id_mapping)
-
+            print("========== result before ==========")
             mean_score = np.mean(scores) if len(scores) else 0
+
+            #format for "extract_spiritual_money" task
+            #delete overlap entity
+            if DEL_OVERLAP_ENTITY:
+                result = self._del_overlap_entity(result)
+            #delete repeat person
+            if DEL_REPEAT_PERSON:
+                result = self._del_repeat_person(result)
+            #add relation
+            if ADD_RELATION:
+                result = self._add_relation(result, relations)
+                
+
             predictions.append({
                 'result': result,
                 'score': float(mean_score),
                 'model_version': 'uie_new'
             })
+
+            print("========== result after ==========")
             print("result: ", result)
             self.task_ids += 1
+            print()
         return predictions
 
-    def fit(self, annotations, workdir=None, **kwargs):
-        #train
+
+    def fit(self, annotation, workdir=None, **kwargs):
+        #train submit or update會跑到這邊
         print('======== in fit ========')
-        print("annotations: ", annotations)
+        if START_LEARNING_LOOP:
+            '''
+            print(kwargs['data'].keys())
+            print("kwargs.data.annotation: ", kwargs['data']['annotation'])
+            print()
+            print("kwargs.data.project: ", kwargs['data']['project'])
+            print()
+            print("kwargs.data.task: ", kwargs['data']['task'])
+            '''
+            #這邊把label-studio output轉成decanno格式
+            self.data_docano_format.append(json.dumps(self._labelstudio2docano(kwargs), ensure_ascii=False))
+
+            #start training
+            if len(self.data_docano_format) == RETRAINING_DATA_SIZE:
+                tmp_path = STORE_PATH + "/ml_backend_tmp_decanno.jsonl"
+                with open(tmp_path, 'w') as f:
+                    for i in self.data_docano_format:
+                        f.write(i + "\n")
+
+                #store training data
+                if STORE_TRAINING_DATA_HISTORY:
+                    path = STORE_PATH + "/ml_backend_history.txt"
+                    with open(path, 'a') as f:
+                        for i in self.data_docano_format:
+                            f.write(i + "\n")
+
+                os.system(
+                    'python3 ./NLLP/experiment/PaddleNLP_UIE/doccano.py \
+                    --doccano_file ' + STORE_PATH + '/ml_backend_tmp_decanno.jsonl \
+                    --task_type ext \
+                    --save_dir ' + STORE_PATH + '\
+                    --seed 20230321 \
+                    --splits 1 0 0 \
+                    --schema_lang ch \
+                    --negative_ratio 3 '
+                )
+
+                os.system(
+                    'export finetuned_model=' + MODEL_PATH
+                )
+
+
+                empty_cache()
+
+                os.system(
+                    "python3 ./NLLP/experiment/PaddleNLP_UIE/finetune.py  \
+                        --device gpu \
+                        --logging_steps 10 \
+                        --save_steps 100 \
+                        --eval_steps 100 \
+                        --seed 87 \
+                        --model_name_or_path uie-base  \
+                        --output_dir " + MODEL_PATH +"\
+                        --train_path " + STORE_PATH + "/train.txt \
+                        --dev_path " + STORE_PATH + "/dev.txt  \
+                        --max_seq_length 512  \
+                        --per_device_eval_batch_size 16\
+                        --per_device_train_batch_size  16 \
+                        --num_train_epochs 3 \
+                        --learning_rate 1e-5 \
+                        --label_names 'start_positions' 'end_positions' \
+                        --do_train \
+                        --do_eval \
+                        --do_export \
+                        --export_model_dir " + MODEL_PATH + " \
+                        --overwrite_output_dir \
+                        --disable_tqdm True \
+                        --metric_for_best_model eval_f1 \
+                        --load_best_model_at_end  True \
+                        --save_total_limit 1"
+                )
+                
+                self.data_docano_format = []
+            #text = kwargs['data']['task']['data']['text']
+
         return
