@@ -2,6 +2,8 @@
 
 本篇將介紹如何透過ML模型，幫助Label Studio標記。
 
+實作範例請參考「toturial.ipynb」。
+
 ## 0. 前言
 
 Label Studio [[1]](https://labelstud.io/) 為目前機器學習常見的標記工具，能透過簡單的UI介面完成大部分機器學習的標記任務，包括Object Dectection, Classification, Named Entity Recognition (NER), Relation Extraction (RE) 等等。
@@ -14,9 +16,13 @@ Label Studio [[1]](https://labelstud.io/) 為目前機器學習常見的標記�
 
 --- 
 
-## 1. 環境
+## 1. 環境/套件版本
 - Python 3.8
 - Ubuntu 20.04
+- paddlenlp 2.5.1
+- paddlepaddle 2.3.2
+- label-studio 1.7.2 
+- label-studio-ml 1.0.9 
 
 ---
 ## 2. 資料
