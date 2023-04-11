@@ -4,7 +4,8 @@ from paddlenlp import Taskflow
 import json
 from label_studio_ml.model import LabelStudioMLBase
 from torch.cuda import empty_cache
-
+import gc
+import pandas as pd
 #Set up label format
 PERSON = '原告'
 CHARGE_MONEY = '非財產上之損害的求償精神慰撫金'
@@ -43,7 +44,7 @@ LABEL_SCHEMA = [CHARGE_MONEY, JUDGE_MONEY,
                  PERSON: JUDGE_MONEY}]
 
 #Set up inference model
-PRECISION = 'fp16' #GPU for fp16
+PRECISION = 'fp32' #GPU for fp16
 MODEL_PATH = "./NLLP/experiment/PaddleNLP_UIE/data_v3/checkpoint/model_best"
 
 #Set up label schema on label-studio
@@ -53,12 +54,13 @@ ADD_RELATION = True
 
 #Set up learning loop parameter
 START_LEARNING_LOOP = True
-RETRAINING_DATA_SIZE = 1
+RETRAINING_DATA_SIZE = 10
 STORE_TRAINING_DATA_HISTORY = True
 STORE_PATH = "./NLLP/experiment/labelstudio"
+LEARNING_FILE_PATH = STORE_PATH + "/ml_backend_tmp_decanno.jsonl"
 
 #Set up model training parameter
-
+BATCH_SIZE = 16
 
 class MyUIEPredictModel(LabelStudioMLBase):
     def __init__(self, **kwargs) -> None:
@@ -69,10 +71,12 @@ class MyUIEPredictModel(LabelStudioMLBase):
         self.to_name = self.info['to_name'][0]
         self.value = self.info['inputs'][0]['value']
         self.labels = list(self.info['labels'])
-        self.task_ids = 1
-        self.total_entity_id = 0
-        self.decanno_ext_id = 1
-        self.data_docano_format = []
+
+        self.dynamic_param = dict(pd.read_json("./my_ml_backend/Dynamic_Config.json", typ='series'))
+        #self.accumulate_task_counter = 1
+        #self.total_entity_id = 0
+        #self.decanno_ext_id = 1
+        #self.data_docano_format = []
 
         #print(os.listdir(MODEL_PATH))
         self.model = Taskflow("information_extraction", schema=LABEL_SCHEMA,
@@ -129,7 +133,7 @@ class MyUIEPredictModel(LabelStudioMLBase):
 
     
     def _labelstudio2docano(self, labelstudio_output):
-        id = self.decanno_ext_id
+        id = self.dynamic_param['decanno_ext_id']
         text = labelstudio_output['data']['task']['data']['text']
         entities = []
         relations = []
@@ -151,8 +155,13 @@ class MyUIEPredictModel(LabelStudioMLBase):
                     "type": label_result['labels'][0]
                 })
                 
-        self.decanno_ext_id += 1
+        self.dynamic_param['decanno_ext_id'] += 1
         return {"id": id, "text": text, "entities": entities, "relations": relations}
+
+
+    def write_dynamic_records(self, json_file="./my_ml_backend/Dynamic_Config.json"):
+        with open(json_file, 'w') as f:
+            json.dump(self.dynamic_param, f, ensure_ascii=False)
 
 
     def predict(self, tasks, **kwargs):
@@ -164,7 +173,7 @@ class MyUIEPredictModel(LabelStudioMLBase):
         #print("tasks: ", tasks)
         for task in tasks:
             print("------------------------------------")
-            print("Predict task number: ", self.task_ids)
+            print("Predict task number: ", self.dynamic_param['accumulate_task_counter'])
             #print("Predict task:", task)
             text = task['data'][self.value]
             uie = model(text)[0]
@@ -188,9 +197,9 @@ class MyUIEPredictModel(LabelStudioMLBase):
                         'from_name': from_name, 
                         'to_name': to_name,
                         'type': 'labels',
-                        'id': str(self.total_entity_id)
+                        'id': str(self.dynamic_param['total_entity_id'])
                     })
-                    self.total_entity_id += 1
+                    self.dynamic_param['total_entity_id'] += 1
                     if item.get('relations') is not None:
                         relations.append(item)
                     scores.append(item['probability'])
@@ -219,14 +228,17 @@ class MyUIEPredictModel(LabelStudioMLBase):
 
             print("========== result after ==========")
             print("result: ", result)
-            self.task_ids += 1
+            self.dynamic_param['accumulate_task_counter'] += 1
             print()
+        
+        self.write_dynamic_records()
         return predictions
 
 
     def fit(self, annotation, workdir=None, **kwargs):
         #train submit or update會跑到這邊
         print('======== in fit ========')
+        print(len(self.dynamic_param['data_docano_format']))
         if START_LEARNING_LOOP:
             '''
             print(kwargs['data'].keys())
@@ -237,21 +249,26 @@ class MyUIEPredictModel(LabelStudioMLBase):
             print("kwargs.data.task: ", kwargs['data']['task'])
             '''
             #這邊把label-studio output轉成decanno格式
-            self.data_docano_format.append(json.dumps(self._labelstudio2docano(kwargs), ensure_ascii=False))
-
-            #start training
-            if len(self.data_docano_format) == RETRAINING_DATA_SIZE:
-                tmp_path = STORE_PATH + "/ml_backend_tmp_decanno.jsonl"
-                with open(tmp_path, 'w') as f:
-                    for i in self.data_docano_format:
-                        f.write(i + "\n")
-
+            #a = dict(json.dumps(self._labelstudio2docano(kwargs), ensure_ascii=False))
+            #print(a)
+            #self.dynamic_param['data_docano_format'].append(json.dumps(self._labelstudio2docano(kwargs), ensure_ascii=False))
+            self.dynamic_param['data_docano_format'].append(self._labelstudio2docano(kwargs))
+            
+            if len(self.dynamic_param['data_docano_format']) == RETRAINING_DATA_SIZE:
+                with open(LEARNING_FILE_PATH, 'a', encoding='utf8') as f:
+                    for i in self.dynamic_param['data_docano_format']:
+                        json.dump(i, f, ensure_ascii=False)
+                        f.write("\n")
+                        
+                
                 #store training data
                 if STORE_TRAINING_DATA_HISTORY:
                     path = STORE_PATH + "/ml_backend_history.txt"
-                    with open(path, 'a') as f:
-                        for i in self.data_docano_format:
-                            f.write(i + "\n")
+                    with open(path, 'a', encoding='utf8') as f:
+                        for i in self.dynamic_param['data_docano_format']:
+                            json.dump(i, f, ensure_ascii=False)
+
+
 
                 os.system(
                     'python3 ./NLLP/experiment/PaddleNLP_UIE/doccano.py \
@@ -268,8 +285,11 @@ class MyUIEPredictModel(LabelStudioMLBase):
                     'export finetuned_model=' + MODEL_PATH
                 )
 
-
                 empty_cache()
+                gc.collect()
+
+                
+                
 
                 os.system(
                     "python3 ./NLLP/experiment/PaddleNLP_UIE/finetune.py  \
@@ -283,9 +303,9 @@ class MyUIEPredictModel(LabelStudioMLBase):
                         --train_path " + STORE_PATH + "/train.txt \
                         --dev_path " + STORE_PATH + "/dev.txt  \
                         --max_seq_length 512  \
-                        --per_device_eval_batch_size 16\
-                        --per_device_train_batch_size  16 \
-                        --num_train_epochs 3 \
+                        --per_device_eval_batch_size " + str(BATCH_SIZE) + "\
+                        --per_device_train_batch_size " + str(BATCH_SIZE) + " \
+                        --num_train_epochs 1 \
                         --learning_rate 1e-5 \
                         --label_names 'start_positions' 'end_positions' \
                         --do_train \
@@ -299,7 +319,9 @@ class MyUIEPredictModel(LabelStudioMLBase):
                         --save_total_limit 1"
                 )
                 
-                self.data_docano_format = []
+                self.dynamic_param['data_docano_format'] = []
+            self.write_dynamic_records()
             #text = kwargs['data']['task']['data']['text']
-
-        return
+            
+        print("============== end of fit() ===============")
+        return {'path': workdir}
