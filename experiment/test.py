@@ -1,2 +1,11 @@
-import torch as tt
-print(tt.tensor([1,2,3]))
+from dataclasses import dataclass
+import sys
+
+n = len(sys.argv)
+
+for i in sys.argv:
+    print(i)
+
+
+    
+
