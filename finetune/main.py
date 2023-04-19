@@ -2,22 +2,42 @@ import argparse
 import logging
 import os
 import sys
-from pdb import set_trace
+from typing import Dict, Optional
+
+from colorama import Back, Fore, Style
+
 
 # 理論上只要把label studio output export到data/raw_data，並改名ls_data.json就可以跑main了
 # 不同實驗應該名稱改experiment_name應該就可以
+class ColoredFormatter(logging.Formatter):
+    """Colored log formatter."""
+
+    def __init__(self, *args, colors: Optional[Dict[str, str]] = None, **kwargs) -> None:
+        """Initialize the formatter with specified format strings."""
+
+        super().__init__(*args, **kwargs)
+
+        self.colors = colors if colors else {}
+
+    def format(self, record) -> str:
+        """Format the specified record as text."""
+
+        record.color = self.colors.get(record.levelname, "")
+        record.reset = Style.RESET_ALL
+
+        return super().format(record)
 
 
 def argument_handler(parser: argparse.ArgumentParser):
     parser.add_argument(
         "--label_studio_output",
-        default="./data/raw_data/ls_data.json",
+        default="./NLLP/finetune/data/raw_data/ls_data.json",
         type=str,
         help="The exported file from label studio (JSON format only).",
     )
     parser.add_argument(
         "--doccano_ext_dir",
-        default="./data/raw_data/doccano_ext.jsonl",
+        default="./NLLP/finetune/data/raw_data/doccano_ext.jsonl",
         type=str,
         help="The converted file from label-studio \
             to decanno (JSONL format only).",
@@ -49,6 +69,12 @@ def argument_handler(parser: argparse.ArgumentParser):
         help="Specific the experiment name.",
     )
     parser.add_argument(
+        "--finetune_model",
+        default="uie-base",
+        type=str,
+        help="The model path or specific model.",
+    )
+    parser.add_argument(
         "--max_seq_length",
         default="512",
         type=str,
@@ -77,19 +103,19 @@ def argument_handler(parser: argparse.ArgumentParser):
 
 
 def main():
+    simple_logger.debug("This Directory: " + os.getcwd())
+
     # convert label-studio to doccano
-    simple_logger.debug("===file location=" + os.getcwd())
     simple_logger.info("Converting label-studio file to doccano format...")
     os.system(
-        f"python3 ./PaddleNLP/labelstudio2doccano.py \
+        f"python3 ./NLLP/finetune/PaddleNLP/labelstudio2doccano.py \
             --labelstudio_file {args.label_studio_output} \
             --doccano_file {args.doccano_ext_dir}"
     )
-    set_trace()
     # split data into train/valid/test
     simple_logger.info("Start spliting data...")
     os.system(
-        f"python3 ./PaddleNLP/doccano.py \
+        f"python3 ./NLLP/finetune/PaddleNLP/doccano.py \
             --doccano_file {args.doccano_ext_dir} \
             --task_type ext \
             --save_dir {experiment_path}\
@@ -101,8 +127,9 @@ def main():
 
     # start finetune
     simple_logger.info("Start finetune...")
+
     os.system(
-        f"python3 ./PaddleNLP/finetune.py  \
+        f"python3 ./NLLP/finetune/PaddleNLP/finetune.py  \
             --device {args.device} \
             --logging_steps 10 \
             --save_steps 100 \
@@ -132,7 +159,7 @@ def main():
 
 def eval():
     os.system(
-        f"python3 ./PaddleNLP/evaluate.py \
+        f"python3 ./NLLP/finetune/PaddleNLP/evaluate.py \
             --model_path {experiment_path}/checkpoint/model_best \
             --test_path {experiment_path}/test.txt \
             --batch_size {args.batch_size} \
@@ -142,15 +169,29 @@ def eval():
 
 if __name__ == "__main__":
     # log
-    simple_logger = logging.getLogger("Experiment log")
-    simple_logger.setLevel(logging.DEBUG)
+    formatter = ColoredFormatter(
+        "{asctime} |{color} {levelname:8} {reset}| {name} | {message}",
+        style="{",
+        datefmt="%Y-%m-%d %H:%M:%S",
+        colors={
+            "DEBUG": Fore.CYAN,
+            "INFO": Fore.GREEN,
+            "WARNING": Fore.YELLOW,
+            "ERROR": Fore.RED,
+            "CRITICAL": Fore.RED + Back.WHITE + Style.BRIGHT,
+        },
+    )
     handler = logging.StreamHandler(sys.stdout)
+    handler.setFormatter(formatter)
+    simple_logger = logging.getLogger("Experiment log")
+    simple_logger.handlers[:] = []
     simple_logger.addHandler(handler)
-
+    simple_logger.setLevel(logging.DEBUG)
+    
     # get argument
     parser = argument_handler(argparse.ArgumentParser())
     args = parser.parse_args()
-    experiment_path = "./data/experiment/" + args.experiment_name
+    experiment_path = "./NLLP/finetune/data/experiment/" + args.experiment_name
 
     # finetune
     simple_logger.info("Start finetune...")
@@ -159,5 +200,5 @@ if __name__ == "__main__":
 
     # evaluation on testing data
     simple_logger.info("Start evaluation...")
-    eval()
+    #eval()
     simple_logger.info("End evaluation...")
