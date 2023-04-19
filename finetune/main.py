@@ -2,6 +2,7 @@ import argparse
 import logging
 import os
 import sys
+from pdb import set_trace
 
 # 理論上只要把label studio output export到data/raw_data，並改名ls_data.json就可以跑main了
 # 不同實驗應該名稱改experiment_name應該就可以
@@ -84,7 +85,7 @@ def main():
             --labelstudio_file {args.label_studio_output} \
             --doccano_file {args.doccano_ext_dir}"
     )
-
+    set_trace()
     # split data into train/valid/test
     simple_logger.info("Start spliting data...")
     os.system(
