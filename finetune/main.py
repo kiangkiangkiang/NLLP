@@ -1,7 +1,7 @@
-import os
-import logging
 import argparse
-
+import logging
+import os
+import sys
 
 # 理論上只要把label studio output export到data/raw_data，並改名ls_data.json就可以跑main了
 # 不同實驗應該名稱改experiment_name應該就可以
@@ -77,6 +77,7 @@ def argument_handler(parser: argparse.ArgumentParser):
 
 def main():
     # convert label-studio to doccano
+    simple_logger.debug("===file location=" + os.getcwd())
     simple_logger.info("Converting label-studio file to doccano format...")
     os.system(
         f"python3 ./PaddleNLP/labelstudio2doccano.py \
@@ -87,7 +88,7 @@ def main():
     # split data into train/valid/test
     simple_logger.info("Start spliting data...")
     os.system(
-        f"!python3 ./PaddleNLP/doccano.py \
+        f"python3 ./PaddleNLP/doccano.py \
             --doccano_file {args.doccano_ext_dir} \
             --task_type ext \
             --save_dir {experiment_path}\
@@ -100,7 +101,7 @@ def main():
     # start finetune
     simple_logger.info("Start finetune...")
     os.system(
-        f"!python3 ./PaddleNLP/finetune.py  \
+        f"python3 ./PaddleNLP/finetune.py  \
             --device {args.device} \
             --logging_steps 10 \
             --save_steps 100 \
@@ -130,22 +131,27 @@ def main():
 
 def eval():
     os.system(
-        f"!python3 ./PaddleNLP/evaluate.py \
+        f"python3 ./PaddleNLP/evaluate.py \
             --model_path {experiment_path}/checkpoint/model_best \
             --test_path {experiment_path}/test.txt \
             --batch_size {args.batch_size} \
-            --max_seq_len {args.max_seq_len}"
+            --max_seq_len {args.max_seq_length}"
     )
 
 
 if __name__ == "__main__":
+    # log
+    simple_logger = logging.getLogger("Experiment log")
+    simple_logger.setLevel(logging.DEBUG)
+    handler = logging.StreamHandler(sys.stdout)
+    simple_logger.addHandler(handler)
+
+    # get argument
     parser = argument_handler(argparse.ArgumentParser())
     args = parser.parse_args()
     experiment_path = "./data/experiment/" + args.experiment_name
 
     # finetune
-    simple_logger = logging.getLogger("Experiment log")
-    simple_logger.setLevel(logging.DEBUG)
     simple_logger.info("Start finetune...")
     main()
     simple_logger.info("End finetune...")
