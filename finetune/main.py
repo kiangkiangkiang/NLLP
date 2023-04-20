@@ -4,6 +4,7 @@ import os
 import sys
 from typing import Dict, Optional
 
+import mlflow
 from colorama import Back, Fore, Style
 
 
@@ -187,7 +188,7 @@ if __name__ == "__main__":
     simple_logger.handlers[:] = []
     simple_logger.addHandler(handler)
     simple_logger.setLevel(logging.DEBUG)
-    
+
     # get argument
     parser = argument_handler(argparse.ArgumentParser())
     args = parser.parse_args()
@@ -200,5 +201,5 @@ if __name__ == "__main__":
 
     # evaluation on testing data
     simple_logger.info("Start evaluation...")
-    #eval()
+    # eval()
     simple_logger.info("End evaluation...")

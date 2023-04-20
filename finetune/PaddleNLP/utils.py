@@ -18,11 +18,11 @@ import random
 import re
 from typing import List, Optional
 
+import mlflow
 import numpy as np
 import paddle
-from tqdm import tqdm
-
 from paddlenlp.utils.log import logger
+from tqdm import tqdm
 
 
 def set_seed(seed):
@@ -188,7 +188,7 @@ def get_relation_type_dict(relation_data, schema_lang="ch"):
             if not added:
                 added_list.append(relation_data[i][0])
                 if schema_lang == "ch":
-                    #print("87 3")
+                    # print("87 3")
                     suffix = relation_data[i][0].rsplit("的", 1)[1]
                     suffix = unify_prompt_name(suffix)
                     relation_type = suffix
@@ -267,7 +267,7 @@ def add_full_negative_example(examples, texts, relation_prompts, predicate_set, 
                     # subject + "的" + predicate -> Chinese
                     # predicate + " of " + subject -> English
                     if schema_lang == "ch":
-                        #print("87 4")
+                        # print("87 4")
                         prompt = subject + "的" + predicate
                     else:
                         prompt = predicate + " of " + subject
@@ -407,17 +407,15 @@ def convert_ext_examples(
                 # xxx + "的" + 情感倾向 -> Chinese
                 # Sentiment classification + " of " + xxx -> English
                 if schema_lang == "ch":
-                    #before luka fix
+                    # before luka fix
                     entity_cls_prompt_prefix = entity_name + "的" + prompt_prefix
 
-                    #after luka fix
-                    #entity_cls_prompt_prefix = entity["label"] + "的" + prompt_prefix
+                    # after luka fix
+                    # entity_cls_prompt_prefix = entity["label"] + "的" + prompt_prefix
                 else:
                     entity_cls_prompt_prefix = prompt_prefix + " of " + entity_name
                 if entity_cls_label is not None:
-                    entity_cls_example = generate_cls_example(
-                        text, entity_cls_label, entity_cls_prompt_prefix, options
-                    )
+                    entity_cls_example = generate_cls_example(text, entity_cls_label, entity_cls_prompt_prefix, options)
 
                     entity_cls_examples.append(entity_cls_example)
 
@@ -458,17 +456,17 @@ def convert_ext_examples(
                 # predicate + " of " + subject -> English
                 if schema_lang == "ch":
                     # luka fix
-                    #print("fdipsji")
-                    #print("fdipsji")
-                    #print("test 88")
-                    #print(entities)
-                    #print(luka_implement_for_subject_name)
+                    # print("fdipsji")
+                    # print("fdipsji")
+                    # print("test 88")
+                    # print(entities)
+                    # print(luka_implement_for_subject_name)
 
-                    #before luka fix 
+                    # before luka fix
                     prompt = entity_map[subject_id]["name"] + "的" + predicate
 
-                    #after luka fix
-                    #prompt = luka_implement_for_subject_name[subject_id] + "的" + predicate
+                    # after luka fix
+                    # prompt = luka_implement_for_subject_name[subject_id] + "的" + predicate
                     inverse_negative = entity_map[object_id]["name"] + "的" + predicate
                 else:
                     prompt = predicate + " of " + entity_map[subject_id]["name"]
@@ -538,12 +536,12 @@ def convert_ext_examples(
                         nonentity_list.sort()
 
                         if schema_lang == "ch":
-                            #print("87 1")
+                            # print("87 1")
                             redundants2 = [
                                 nonentity + "的" + predicate_list[i][random.randrange(len(predicate_list[i]))]
                                 for nonentity in nonentity_list
                             ]
-                            #print(redundants2)
+                            # print(redundants2)
                         else:
                             redundants2 = [
                                 predicate_list[i][random.randrange(len(predicate_list[i]))] + " of " + nonentity
@@ -557,12 +555,12 @@ def convert_ext_examples(
                         non_ent_label_list.sort()
 
                         if schema_lang == "ch":
-                            #print("87 2")
+                            # print("87 2")
                             redundants3 = [
                                 subject_goldens[i][random.randrange(len(subject_goldens[i]))] + "的" + non_ent_label
                                 for non_ent_label in non_ent_label_list
                             ]
-                            
+
                         else:
                             redundants3 = [
                                 non_ent_label + " of " + subject_goldens[i][random.randrange(len(subject_goldens[i]))]
@@ -700,3 +698,14 @@ def convert_example(
             "end_positions": end_ids,
         }
     return tokenized_output
+
+
+def get_or_create_experiment_and_return_exp_id(exp_name: str) -> str:
+    client = mlflow.client.MlflowClient()
+    try:
+        exp_id = client.create_experiment(exp_name)
+    except mlflow.exceptions.MlflowException:
+        # experiment name already exist!
+        exp = client.get_experiment_by_name(exp_name)
+        exp_id = exp.experiment_id
+    return exp_id

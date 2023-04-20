@@ -13,19 +13,20 @@
 # limitations under the License.
 
 import os
+import pdb
 from dataclasses import dataclass, field
 from functools import partial
 from typing import List, Optional
 
+import mlflow
 import paddle
 from paddlenlp.data import DataCollatorWithPadding
 from paddlenlp.datasets import load_dataset
 from paddlenlp.metrics import SpanEvaluator
-from paddlenlp.trainer import (CompressionArguments, PdArgumentParser, Trainer,
-                               get_last_checkpoint)
+from paddlenlp.trainer import CompressionArguments, PdArgumentParser, Trainer, get_last_checkpoint
 from paddlenlp.transformers import UIE, UIEM, AutoTokenizer, export_model
 from paddlenlp.utils.log import logger
-from utils import convert_example, reader
+from utils import convert_example, get_or_create_experiment_and_return_exp_id, reader
 
 
 @dataclass
@@ -78,14 +79,10 @@ class ModelArguments:
 
 
 def main():
-    
+
     parser = PdArgumentParser((ModelArguments, DataArguments, CompressionArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
-    
-    
 
-    
-    
     if model_args.model_name_or_path in ["uie-m-base", "uie-m-large"]:
         model_args.multilingual = True
 
@@ -194,75 +191,98 @@ def main():
         checkpoint = last_checkpoint
 
     # Training
-    if training_args.do_train:
-        train_result = trainer.train(resume_from_checkpoint=checkpoint)
-        metrics = train_result.metrics
-        trainer.save_model()
-        trainer.log_metrics("train", metrics)
-        trainer.save_metrics("train", metrics)
-        trainer.save_state()
+    pdb.set_trace()
+    with mlflow.start_run(
+        run_name="luka test run 1", experiment_id=exp_id, tags=run_tags, description="A pytorch CIFAR10 example"
+    ) as run:
 
-    # Evaluate and tests model
-    if training_args.do_eval:
-        eval_metrics = trainer.evaluate()
-        trainer.log_metrics("eval", eval_metrics)
+        mlflow.log_params(
+            dict(
+                batch_size=training_args.batch_size,
+                learning_rate=training_args.learning_rate,
+                n_epoch=training_args.num_train_epochs,
+            )
+        )
 
-    # export inference model
-    if training_args.do_export:
-        # You can also load from certain checkpoint
-        # trainer.load_state_dict_from_checkpoint("/path/to/checkpoint/")
-        if training_args.device == "npu":
-            # npu will transform int64 to int32 for internal calculation.
-            # To reduce useless transformation, we feed int32 inputs.
-            input_spec_dtype = "int32"
-        else:
-            input_spec_dtype = "int64"
-        if model_args.multilingual:
-            input_spec = [
-                paddle.static.InputSpec(shape=[None, None], dtype=input_spec_dtype, name="input_ids"),
-                paddle.static.InputSpec(shape=[None, None], dtype=input_spec_dtype, name="position_ids"),
-            ]
-        else:
-            input_spec = [
-                paddle.static.InputSpec(shape=[None, None], dtype=input_spec_dtype, name="input_ids"),
-                paddle.static.InputSpec(shape=[None, None], dtype=input_spec_dtype, name="token_type_ids"),
-                paddle.static.InputSpec(shape=[None, None], dtype=input_spec_dtype, name="position_ids"),
-                paddle.static.InputSpec(shape=[None, None], dtype=input_spec_dtype, name="attention_mask"),
-            ]
-        if model_args.export_model_dir is None:
-            model_args.export_model_dir = os.path.join(training_args.output_dir, "export")
-        export_model(model=trainer.model, input_spec=input_spec, path=model_args.export_model_dir)
-    if training_args.do_compress:
+        if training_args.do_train:
+            train_result = trainer.train(resume_from_checkpoint=checkpoint)
+            metrics = train_result.metrics
+            pdb.set_trace()
+            trainer.save_model()
+            trainer.log_metrics("train", metrics)
+            trainer.save_metrics("train", metrics)
+            trainer.save_state()
+            pdb.set_trace()
 
-        @paddle.no_grad()
-        def custom_evaluate(self, model, data_loader):
-            metric = SpanEvaluator()
-            model.eval()
-            metric.reset()
-            for batch in data_loader:
-                if model_args.multilingual:
-                    logits = model(input_ids=batch["input_ids"], position_ids=batch["position_ids"])
-                else:
-                    logits = model(
-                        input_ids=batch["input_ids"],
-                        token_type_ids=batch["token_type_ids"],
-                        position_ids=batch["position_ids"],
-                        attention_mask=batch["attention_mask"],
-                    )
-                start_prob, end_prob = logits
-                start_ids, end_ids = batch["start_positions"], batch["end_positions"]
-                num_correct, num_infer, num_label = metric.compute(start_prob, end_prob, start_ids, end_ids)
-                metric.update(num_correct, num_infer, num_label)
-            precision, recall, f1 = metric.accumulate()
-            logger.info("f1: %s, precision: %s, recall: %s" % (f1, precision, f1))
-            model.train()
-            return f1
+        # Evaluate and tests model
+        if training_args.do_eval:
+            eval_metrics = trainer.evaluate()
+            trainer.log_metrics("eval", eval_metrics)
+            pdb.set_trace()
 
-        trainer.compress(custom_evaluate=custom_evaluate)
+        # export inference model
+        if training_args.do_export:
+            # You can also load from certain checkpoint
+            # trainer.load_state_dict_from_checkpoint("/path/to/checkpoint/")
+            if training_args.device == "npu":
+                # npu will transform int64 to int32 for internal calculation.
+                # To reduce useless transformation, we feed int32 inputs.
+                input_spec_dtype = "int32"
+            else:
+                input_spec_dtype = "int64"
+            if model_args.multilingual:
+                input_spec = [
+                    paddle.static.InputSpec(shape=[None, None], dtype=input_spec_dtype, name="input_ids"),
+                    paddle.static.InputSpec(shape=[None, None], dtype=input_spec_dtype, name="position_ids"),
+                ]
+            else:
+                input_spec = [
+                    paddle.static.InputSpec(shape=[None, None], dtype=input_spec_dtype, name="input_ids"),
+                    paddle.static.InputSpec(shape=[None, None], dtype=input_spec_dtype, name="token_type_ids"),
+                    paddle.static.InputSpec(shape=[None, None], dtype=input_spec_dtype, name="position_ids"),
+                    paddle.static.InputSpec(shape=[None, None], dtype=input_spec_dtype, name="attention_mask"),
+                ]
+            if model_args.export_model_dir is None:
+                model_args.export_model_dir = os.path.join(training_args.output_dir, "export")
+            export_model(model=trainer.model, input_spec=input_spec, path=model_args.export_model_dir)
+        if training_args.do_compress:
+
+            @paddle.no_grad()
+            def custom_evaluate(self, model, data_loader):
+                metric = SpanEvaluator()
+                model.eval()
+                metric.reset()
+                for batch in data_loader:
+                    if model_args.multilingual:
+                        logits = model(input_ids=batch["input_ids"], position_ids=batch["position_ids"])
+                    else:
+                        logits = model(
+                            input_ids=batch["input_ids"],
+                            token_type_ids=batch["token_type_ids"],
+                            position_ids=batch["position_ids"],
+                            attention_mask=batch["attention_mask"],
+                        )
+                    start_prob, end_prob = logits
+                    start_ids, end_ids = batch["start_positions"], batch["end_positions"]
+                    num_correct, num_infer, num_label = metric.compute(start_prob, end_prob, start_ids, end_ids)
+                    metric.update(num_correct, num_infer, num_label)
+                precision, recall, f1 = metric.accumulate()
+                logger.info("f1: %s, precision: %s, recall: %s" % (f1, precision, f1))
+                model.train()
+                return f1
+
+            trainer.compress(custom_evaluate=custom_evaluate)
 
 
 if __name__ == "__main__":
     # mlflow setting
     # exec(open("./private/set_envir_for_mlflow.py").read())
+
+    # mlflow setting
+    os.environ["MLFLOW_TRACKING_URI"] = "http://ec2-44-213-176-187.compute-1.amazonaws.com:7003"
+    os.environ["MLFLOW_TRACKING_USERNAME"] = "cathayins"
+    os.environ["MLFLOW_TRACKING_PASSWORD"] = "cathayins"
+    exp_id = get_or_create_experiment_and_return_exp_id("lab_luka_test_manual_log")
+    run_tags = {"user": "lab_luka", "XDXD": "teststestestse"}
 
     main()
