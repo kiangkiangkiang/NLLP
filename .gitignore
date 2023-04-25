@@ -5,3 +5,4 @@ experiment/PaddleNLP_UIE/data_v3/checkpoint
 experiment/PaddleNLP_UIE/data_v4/checkpoint
 experiment/PaddleNLP_UIE/data_v5/checkpoint
 finetune/data/experiment/V1/checkpoint
+data_preprocess/final_data.npy
