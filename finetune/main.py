@@ -7,7 +7,6 @@ from typing import Dict, Optional
 import mlflow
 from colorama import Back, Fore, Style
 
-print(123)
 # 理論上只要把label studio output export到data/raw_data，並改名ls_data.json就可以跑main了
 # 不同實驗應該名稱改experiment_name應該就可以
 class ColoredFormatter(logging.Formatter):

@@ -82,7 +82,7 @@ def do_convert():
                 f.write(json.dumps(example, ensure_ascii=False) + "\n")
                 count += 1
         logger.info("Save %d examples to %s." % (count, save_path))
-    
+
     if len(args.splits) == 0:
         if args.task_type == "ext":
             examples = _create_ext_examples(
@@ -116,7 +116,6 @@ def do_convert():
         with open(os.path.join(args.save_dir, "sample_index.json"), "w") as fp:
             maps = {"train_ids": train_ids, "dev_ids": dev_ids, "test_ids": test_ids}
             fp.write(json.dumps(maps))
-        
 
         if args.task_type == "ext":
             train_examples = _create_ext_examples(
@@ -146,12 +145,7 @@ def do_convert():
                 is_train=False,
                 schema_lang=args.schema_lang,
             )
-            #print("this is my 87 test....")
-            #print("args.prompt_prefix = ", args.prompt_prefix)
-            #print("args.options = ", args.options)
-            #print("args.separator = ", args.separator)
 
-            #print("end my 87 test.....")
         else:
             train_examples = _create_cls_examples(raw_examples[:p1], args.prompt_prefix, args.options)
             dev_examples = _create_cls_examples(raw_examples[p1:p2], args.prompt_prefix, args.options)
