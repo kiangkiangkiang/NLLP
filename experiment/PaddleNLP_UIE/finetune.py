@@ -31,6 +31,7 @@ from paddlenlp.trainer import (
 )
 from paddlenlp.transformers import UIE, UIEM, AutoTokenizer, export_model
 from paddlenlp.utils.log import logger
+import pdb
 
 
 @dataclass
@@ -45,9 +46,7 @@ class DataArguments:
         default=None, metadata={"help": "The name of the dataset to use (via the datasets library)."}
     )
 
-    dev_path: str = field(
-        default=None, metadata={"help": "The name of the dataset to use (via the datasets library)."}
-    )
+    dev_path: str = field(default=None, metadata={"help": "The name of the dataset to use (via the datasets library)."})
 
     max_seq_length: Optional[int] = field(
         default=512,
@@ -126,16 +125,16 @@ def main():
 
     train_ds = load_dataset(reader, data_path=data_args.train_path, max_seq_len=data_args.max_seq_length, lazy=False)
     dev_ds = load_dataset(reader, data_path=data_args.dev_path, max_seq_len=data_args.max_seq_length, lazy=False)
-    #print("test2 ===== ")
+    # print("test2 ===== ")
 
-    #print(train_ds[2])
-    #print(tokenizer(train_ds[0]["prompt"]))
-    #print(tokenizer(train_ds[0]["content"]))
-    #a = tokenizer(train_ds[0]["content"])
-    
-    #print(len(train_ds[3]["content"]))
-    #print(train_ds[0].keys())
-    #print(type(train_ds))
+    # print(train_ds[2])
+    # print(tokenizer(train_ds[0]["prompt"]))
+    # print(tokenizer(train_ds[0]["content"]))
+    # a = tokenizer(train_ds[0]["content"])
+
+    # print(len(train_ds[3]["content"]))
+    # print(train_ds[0].keys())
+    # print(type(train_ds))
     trans_fn = partial(
         convert_example,
         tokenizer=tokenizer,
@@ -146,20 +145,19 @@ def main():
 
     train_ds = train_ds.map(trans_fn)
     dev_ds = dev_ds.map(trans_fn)
-    
-    #print("test3 ===== ")
-    #print(type(train_ds[0]))
-    
-    #print(train_ds[0])
-    #print("decode===================")
-    #print(tokenizer.decode(train_ds[2]['input_ids']))
-    #print(train_ds[2])
-    #print(train_ds[2])
-    #print(train_ds[0].keys())
-    #print(type(train_ds[2]["input_ids"]))
-    #print(type(train_ds))
-    
-    
+
+    # print("test3 ===== ")
+    # print(type(train_ds[0]))
+
+    # print(train_ds[0])
+    # print("decode===================")
+    # print(tokenizer.decode(train_ds[2]['input_ids']))
+    # print(train_ds[2])
+    # print(train_ds[2])
+    # print(train_ds[0].keys())
+    # print(type(train_ds[2]["input_ids"]))
+    # print(type(train_ds))
+
     if training_args.device == "npu":
         data_collator = DataCollatorWithPadding(tokenizer, padding="longest")
     else:
@@ -201,21 +199,18 @@ def main():
         compute_metrics=compute_metrics,
     )
 
+    # print("sec 87 test=====")
 
-    #print("sec 87 test=====")
-    
-    #print(train_ds)
-    #print(len(train_ds))
-    #print(train_ds[2])
-    #print(train_ds[0].keys())
-    #print(len(train_ds[20]["input_ids"]))
-    #print(train_ds[20])
-    #print(train_ds[10]["end_positions"])
-    #return
-    #print("end 87 test ========")
-    trainer.optimizer = paddle.optimizer.AdamW(
-        learning_rate=training_args.learning_rate, parameters=model.parameters()
-    )
+    # print(train_ds)
+    # print(len(train_ds))
+    # print(train_ds[2])
+    # print(train_ds[0].keys())
+    # print(len(train_ds[20]["input_ids"]))
+    # print(train_ds[20])
+    # print(train_ds[10]["end_positions"])
+    # return
+    # print("end 87 test ========")
+    trainer.optimizer = paddle.optimizer.AdamW(learning_rate=training_args.learning_rate, parameters=model.parameters())
     checkpoint = None
     if training_args.resume_from_checkpoint is not None:
         checkpoint = training_args.resume_from_checkpoint
@@ -288,8 +283,6 @@ def main():
             return f1
 
         trainer.compress(custom_evaluate=custom_evaluate)
-    
-
 
 
 if __name__ == "__main__":

@@ -5,6 +5,11 @@ data_root = "/Users/cfh00892302/Desktop/myWorkspace/NLLP/data_preprocess/"
 random_size = 5
 
 my_final_data = np.load(data_root + "final_data.npy", allow_pickle=True)
+
+for i in my_final_data[5][6][0].split("\r\n"):
+    print(i)
+
+
 jasper_data = np.loadtxt(data_root + "test_for_jasper.txt", dtype=str)
 ind = np.random.choice(range(len(my_final_data)), random_size, replace=False)
 print(ind)
